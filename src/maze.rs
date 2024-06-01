@@ -1,5 +1,3 @@
-use std::alloc::GlobalAlloc;
-
 use serde::{Deserialize, Serialize};
 use tenji_draw::tenji_draw;
 
@@ -12,6 +10,20 @@ use tenji_draw::tenji_draw;
 
     Horizontal walls are blocks between (x,y) and (x,y+1)
     Vertical walls are blocks between (x,y) and (x+1,y)
+
+    Vertical walls:
+       |     North
+     4 +---+---+---+---+
+       |               |
+ Y   3 +   +   +   +   +
+ ^     |               |
+West 2 +   +   +   +   + East
+       |               |
+     1 +   +   +   +   +
+       |               |
+     0 +---+---+---+---+---Horizontal walls
+       0   1   2   3   4
+             South >X
 */
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -21,12 +33,56 @@ pub enum Wall {
     Unexplored,
 }
 
+impl Wall {
+    pub fn make_wall_detection_log(left: Wall, front: Wall, right: Wall) -> String {
+        let mut s = String::new();
+        s += match left {
+            Wall::Absent => " ",
+            Wall::Present => "|",
+            Wall::Unexplored => "?",
+        };
+        s += match front {
+            Wall::Absent => " ",
+            Wall::Present => "-",
+            Wall::Unexplored => "?",
+        };
+        s += match right {
+            Wall::Absent => " ",
+            Wall::Present => "|",
+            Wall::Unexplored => "?",
+        };
+        s
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum Direction {
     Forward,
     Left,
     Right,
     Backward,
+}
+
+impl Direction {
+    pub fn to_log(&self) -> &str {
+        match self {
+            Direction::Forward => "F^",
+            Direction::Left => "L<",
+            Direction::Right => "R>",
+            Direction::Backward => "Bv",
+        }
+    }
+
+    pub fn iter() -> impl Iterator<Item = Direction> {
+        [
+            Direction::Forward,
+            Direction::Left,
+            Direction::Right,
+            Direction::Backward,
+        ]
+        .iter()
+        .copied()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -38,7 +94,7 @@ pub enum Compass {
 }
 
 impl Compass {
-    fn turn(&self, direction: Direction) -> Compass {
+    pub fn turn(&self, direction: Direction) -> Compass {
         match (self, direction) {
             (Compass::North, Direction::Forward) => Compass::North,
             (Compass::North, Direction::Left) => Compass::West,
@@ -58,6 +114,95 @@ impl Compass {
             (Compass::West, Direction::Backward) => Compass::East,
         }
     }
+
+    pub fn to_log(&self) -> &str {
+        match self {
+            Compass::North => "N",
+            Compass::East => "E",
+            Compass::South => "S",
+            Compass::West => "W",
+        }
+    }
+
+    // Return the Direction to face the given compass from the current compass
+    pub fn get_direction_to(&self, target: Compass) -> Direction {
+        match (self, target) {
+            (Compass::North, Compass::North) => Direction::Forward,
+            (Compass::North, Compass::East) => Direction::Right,
+            (Compass::North, Compass::South) => Direction::Backward,
+            (Compass::North, Compass::West) => Direction::Left,
+            (Compass::East, Compass::North) => Direction::Left,
+            (Compass::East, Compass::East) => Direction::Forward,
+            (Compass::East, Compass::South) => Direction::Right,
+            (Compass::East, Compass::West) => Direction::Backward,
+            (Compass::South, Compass::North) => Direction::Backward,
+            (Compass::South, Compass::East) => Direction::Left,
+            (Compass::South, Compass::South) => Direction::Forward,
+            (Compass::South, Compass::West) => Direction::Right,
+            (Compass::West, Compass::North) => Direction::Right,
+            (Compass::West, Compass::East) => Direction::Backward,
+            (Compass::West, Compass::South) => Direction::Left,
+            (Compass::West, Compass::West) => Direction::Forward,
+        }
+    }
+
+    pub fn iter() -> impl Iterator<Item = Compass> {
+        [Compass::North, Compass::East, Compass::South, Compass::West]
+            .iter()
+            .copied()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub struct Position {
+    pub x: usize,
+    pub y: usize,
+}
+
+impl Position {
+    pub fn new(x: usize, y: usize) -> Self {
+        Position { x, y }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub struct Location {
+    pub pos: Position,
+    pub dir: Compass,
+}
+
+impl Location {
+    pub fn new() -> Self {
+        Location {
+            pos: Position { x: 0, y: 0 },
+            dir: Compass::North,
+        }
+    }
+
+    pub fn turn(&mut self, dir: Direction) {
+        self.dir = self.dir.turn(dir);
+    }
+
+    pub fn forward(&mut self) {
+        match self.dir {
+            Compass::North => self.pos.y += 1,
+            Compass::East => self.pos.x += 1,
+            Compass::South => self.pos.y -= 1,
+            Compass::West => self.pos.x -= 1,
+        }
+    }
+}
+
+impl std::fmt::Display for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Y:{:2}, X:{:2}, Dir:", self.pos.y, self.pos.x)?;
+        match self.dir {
+            Compass::North => write!(f, "N"),
+            Compass::East => write!(f, "E"),
+            Compass::South => write!(f, "S"),
+            Compass::West => write!(f, "W"),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -66,18 +211,20 @@ pub struct Maze {
     height: usize,
     horizontal_walls: Vec<Vec<Wall>>,
     vertical_walls: Vec<Vec<Wall>>,
-    goal: (usize, usize),
+    goal: Position,
 }
 
 impl Maze {
     pub fn new(width: usize, height: usize) -> Self {
-        Maze {
+        let mut maze = Maze {
             width,
             height,
             horizontal_walls: vec![vec![Wall::Unexplored; width]; height + 1],
             vertical_walls: vec![vec![Wall::Unexplored; width + 1]; height],
-            goal: (0, 0),
-        }
+            goal: Position { x: 0, y: 0 },
+        };
+        maze.init();
+        maze
     }
 
     pub fn init(&mut self) {
@@ -107,33 +254,60 @@ impl Maze {
         self.set(0, 0, Compass::North.turn(Direction::Right), Wall::Present);
 
         // Set the goal
-        self.goal = (7, 7);
+        self.goal = Position {
+            x: self.width / 2,
+            y: self.height / 2,
+        };
     }
 
-    pub fn get(&self, x: usize, y: usize, compass: Compass) -> Wall {
+    pub fn get(&self, y: usize, x: usize, compass: Compass) -> Wall {
         match compass {
-            Compass::North => self.horizontal_walls[y][x],
+            Compass::North => self.horizontal_walls[y + 1][x],
             Compass::East => self.vertical_walls[y][x + 1],
-            Compass::South => self.horizontal_walls[y + 1][x],
+            Compass::South => self.horizontal_walls[y][x],
             Compass::West => self.vertical_walls[y][x],
         }
     }
 
-    pub fn set(&mut self, x: usize, y: usize, compass: Compass, wall: Wall) {
+    pub fn set(&mut self, y: usize, x: usize, compass: Compass, wall: Wall) {
+        // Check outer walls
+        if (y == 0 && compass == Compass::South && wall != Wall::Present)
+            || (y == self.height && compass == Compass::North && wall != Wall::Present)
+            || (x == 0 && compass == Compass::West && wall != Wall::Present)
+            || (x == self.width && compass == Compass::East && wall != Wall::Present)
+        {
+            // Cannot remove the outer wall
+            log::warn!(
+                "Cannot remove the outer wall. Operation is ignored. Y: {}, X: {}, compass: {:?}",
+                y,
+                x,
+                compass
+            );
+            return;
+        }
+
         match compass {
-            Compass::North => self.horizontal_walls[y][x] = wall,
+            Compass::North => self.horizontal_walls[y + 1][x] = wall,
             Compass::East => self.vertical_walls[y][x + 1] = wall,
-            Compass::South => self.horizontal_walls[y + 1][x] = wall,
+            Compass::South => self.horizontal_walls[y][x] = wall,
             Compass::West => self.vertical_walls[y][x] = wall,
         }
     }
 
-    pub fn get_goal(&self) -> (usize, usize) {
+    pub fn get_goal(&self) -> Position {
         self.goal
     }
 
-    pub fn set_goal(&mut self, x: usize, y: usize) {
-        self.goal = (x, y);
+    pub fn set_goal(&mut self, pos: Position) {
+        self.goal = pos;
+    }
+
+    pub fn get_width(&self) -> usize {
+        self.width
+    }
+
+    pub fn get_height(&self) -> usize {
+        self.height
     }
 
     /*
@@ -215,7 +389,7 @@ impl Maze {
                 // Goal location
                 let c = lines[y * 2 + 1].chars().nth(x * 2 + 1).unwrap();
                 if c == 'G' {
-                    self.goal = (x, y);
+                    self.goal = Position { x, y };
                 }
             }
         }
@@ -243,9 +417,10 @@ impl Maze {
     ) -> String {
         let mut lines: Vec<String> = Vec::new();
         let mut line = "".to_string();
-        let (gx, gy) = self.goal;
         for i in 0..self.height {
+            // y
             for j in 0..self.width {
+                // x
                 line += &pillar;
                 line += match self.horizontal_walls[i][j] {
                     Wall::Absent => &horizontal_wall_absent,
@@ -262,7 +437,7 @@ impl Maze {
                     Wall::Present => &vertical_wall_present,
                     Wall::Unexplored => &vertical_wall_unexplored,
                 };
-                if j == gx && i == gy {
+                if j == self.goal.x && i == self.goal.y {
                     line += &goal;
                 } else {
                     // goalと同じ長さになるように空白を追加
@@ -289,6 +464,48 @@ impl Maze {
             .map(|l| l.to_string())
             .collect::<Vec<String>>()
             .join("\n")
+    }
+
+    /*
+       This function returns the coordinates of the cell that is adjacent to the cell at (x, y)
+       When the the cell is at the edge of the maze, None is returned
+    */
+    pub fn get_neighbor_cell(
+        &self,
+        y: usize,
+        x: usize,
+        compass: Compass,
+    ) -> Option<(usize, usize)> {
+        match compass {
+            Compass::North => {
+                if y == self.height - 1 {
+                    None
+                } else {
+                    Some((y + 1, x))
+                }
+            }
+            Compass::East => {
+                if x == self.width - 1 {
+                    None
+                } else {
+                    Some((y, x + 1))
+                }
+            }
+            Compass::South => {
+                if y == 0 {
+                    None
+                } else {
+                    Some((y - 1, x))
+                }
+            }
+            Compass::West => {
+                if x == 0 {
+                    None
+                } else {
+                    Some((y, x - 1))
+                }
+            }
+        }
     }
 }
 
