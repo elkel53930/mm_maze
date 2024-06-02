@@ -1,6 +1,6 @@
-mod adachi;
-mod maze;
-mod path_finder;
+pub mod adachi;
+pub mod maze;
+pub mod path_finder;
 
 #[cfg(test)]
 mod tests {
