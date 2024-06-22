@@ -56,7 +56,6 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "tenji_draw",
 ]
 
 [[package]]
@@ -124,10 +123,6 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
-
-[[package]]
-name = "tenji_draw"
-version = "0.1.0"
 
 [[package]]
 name = "unicode-ident"

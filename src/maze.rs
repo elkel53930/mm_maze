@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use tenji_draw::tenji_draw;
 
 /*
     Coordinate system:
@@ -397,7 +396,7 @@ impl Maze {
     }
 
     pub fn write_maze_file(&self, filename: &str) -> Result<(), String> {
-        let mut contents = self.to_text_data(" ", "-", " ", " ", "|", " ", "+", "G");
+        let contents = self.to_text_data(" ", "-", " ", " ", "|", " ", "+", "G");
         match std::fs::write(filename, contents) {
             Ok(_) => Ok(()),
             Err(e) => Err(e.to_string()),

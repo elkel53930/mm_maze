@@ -1,5 +1,3 @@
-use std::str::Chars;
-
 use crate::maze::{Compass, Direction, Location, Maze, Position, Wall};
 use crate::path_finder::PathFinder;
 use log;
@@ -195,7 +193,6 @@ impl PathFinder for Adachi {
         }
         if self.maze.get(cur_y, cur_x, Compass::West) == Wall::Absent {
             if self.step_map[cur_y][cur_x - 1] < min_step {
-                min_step = self.step_map[cur_y][cur_x - 1];
                 result = Some(Compass::West);
             }
         }
