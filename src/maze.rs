@@ -52,6 +52,10 @@ impl Wall {
         };
         s
     }
+
+    pub fn from_bool(b: bool) -> Wall{
+        if b {Wall::Present} else {Wall::Absent}
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -516,5 +520,21 @@ impl std::fmt::Display for Maze {
             self.to_text_data("  ", "--", "  ", " ", "|", " ", "+", "GL")
         )?;
         Ok(())
+    }
+}
+
+impl Default for Maze{
+    fn default() -> Self {
+        let width = 16;
+        let height = 16;
+        let mut maze = Maze {
+        width,
+        height,
+        horizontal_walls: vec![vec![Wall::Unexplored; width]; height + 1],
+        vertical_walls: vec![vec![Wall::Unexplored; width + 1]; height],
+        goal: Position { x: 0, y: 0 },
+    };
+    maze.init();
+    maze
     }
 }
