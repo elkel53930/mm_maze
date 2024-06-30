@@ -220,4 +220,8 @@ impl PathFinder for Adachi {
     fn set_location(&mut self, location: Location) {
         self.location = location;
     }
+
+    fn get_maze(&self) -> &Maze {
+        &self.maze
+    }
 }

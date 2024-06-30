@@ -56,6 +56,14 @@ impl Wall {
     pub fn from_bool(b: bool) -> Wall{
         if b {Wall::Present} else {Wall::Absent}
     }
+
+    pub fn to_bool(&self) -> bool{
+        match self {
+            Wall::Absent => false,
+            Wall::Present => true,
+            Wall::Unexplored => false,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -175,10 +183,10 @@ pub struct Location {
 }
 
 impl Location {
-    pub fn new() -> Self {
+    pub fn new(pos: Position, dir: Compass) -> Self {
         Location {
-            pos: Position { x: 0, y: 0 },
-            dir: Compass::North,
+            pos: pos,
+            dir: dir,
         }
     }
 
@@ -192,6 +200,15 @@ impl Location {
             Compass::East => self.pos.x += 1,
             Compass::South => self.pos.y -= 1,
             Compass::West => self.pos.x -= 1,
+        }
+    }
+}
+
+impl Default for Location {
+    fn default() -> Self {
+        Location {
+            pos: Position { x: 0, y: 0 },
+            dir: Compass::North,
         }
     }
 }

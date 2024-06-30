@@ -11,4 +11,5 @@ pub trait PathFinder {
     ) -> Result<maze::Direction>;
     fn get_location(&self) -> maze::Location;
     fn set_location(&mut self, location: maze::Location);
+    fn get_maze(&self) -> &maze::Maze;
 }
